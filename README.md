@@ -35,16 +35,16 @@ Client (REST)
 
 ## Tech Stack
 
-| Layer         | Teknologi                  |
-| ------------- | -------------------------- |
-| Language      | Go 1.25+                   |
+| Layer | Teknologi |
+|---|---|
+| Language | Go 1.25+ |
 | Inter-service | gRPC + Protocol Buffers v3 |
-| REST Gateway  | grpc-gateway v2            |
-| Load Balancer | Nginx                      |
-| Database      | PostgreSQL 16              |
-| Query         | sqlc + golang-migrate      |
-| Auth          | JWT (golang-jwt/jwt)       |
-| Container     | Docker + Docker Compose    |
+| REST Gateway | grpc-gateway v2 |
+| Load Balancer | Nginx |
+| Database | PostgreSQL 16 |
+| Query | sqlc + golang-migrate |
+| Auth | JWT (golang-jwt/jwt) |
+| Container | Docker + Docker Compose |
 
 ## Cara Menjalankan
 
@@ -189,6 +189,22 @@ grpc-ecommerce/
 - ✅ Load balancer dengan Nginx
 - ✅ Database-per-service pattern
 - ✅ Single command deployment: `docker compose up`
+
+## Performance Benchmark
+
+Diuji menggunakan [k6](https://k6.io) dengan 3 skenario: load test (50 VUs), stress test (300 VUs), dan spike test (lonjakan tiba-tiba ke 300 VUs). Total durasi ~6 menit, 153.564 requests.
+
+| Metrik | Hasil |
+|---|---|
+| Throughput | 450 req/s |
+| Median latency | 0.9ms |
+| p90 latency | 4.61ms |
+| p95 latency | 6.03ms |
+| p99 latency | 49ms |
+| Error rate | 0.19% |
+| Total requests | 153.564 |
+
+Semua threshold PRD terpenuhi: p99 < 100ms ✅
 
 ## Author
 
