@@ -7,6 +7,7 @@ import (
 	pb "github.com/mfuadfakhruzzaki/grpc-ecommerce/proto/user/v1"
 	svc "github.com/mfuadfakhruzzaki/grpc-ecommerce/user-service/internal/service"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -17,6 +18,22 @@ type UserHandler struct {
 
 func New(svc *svc.UserService) *UserHandler {
 	return &UserHandler{svc: svc}
+}
+
+func userIDFromCtx(ctx context.Context) (uuid.UUID, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return uuid.UUID{}, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+	vals := md.Get("x-user-id")
+	if len(vals) == 0 {
+		return uuid.UUID{}, status.Error(codes.Unauthenticated, "missing user id")
+	}
+	id, err := uuid.Parse(vals[0])
+	if err != nil {
+		return uuid.UUID{}, status.Error(codes.Unauthenticated, "invalid user id")
+	}
+	return id, nil
 }
 
 func (h *UserHandler) RegisterUser(ctx context.Context, req *pb.RegisterUserReq) (*pb.RegisterUserRes, error) {
@@ -43,9 +60,9 @@ func (h *UserHandler) LoginUser(ctx context.Context, req *pb.LoginUserReq) (*pb.
 }
 
 func (h *UserHandler) GetProfile(ctx context.Context, req *pb.GetProfileReq) (*pb.GetProfileRes, error) {
-	userID, ok := ctx.Value("user_id").(uuid.UUID)
-	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "missing user id")
+	userID, err := userIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 	user, err := h.svc.GetProfile(ctx, userID)
 	if err != nil {
@@ -60,9 +77,9 @@ func (h *UserHandler) GetProfile(ctx context.Context, req *pb.GetProfileReq) (*p
 }
 
 func (h *UserHandler) UpdateProfile(ctx context.Context, req *pb.UpdateProfileReq) (*pb.UpdateProfileRes, error) {
-	userID, ok := ctx.Value("user_id").(uuid.UUID)
-	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "missing user id")
+	userID, err := userIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 	user, err := h.svc.UpdateProfile(ctx, userID, req.FullName, req.AvatarUrl)
 	if err != nil {

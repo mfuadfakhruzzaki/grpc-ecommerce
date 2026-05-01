@@ -1,18 +1,15 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 func JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth untuk endpoint publik
 		if strings.HasPrefix(r.URL.Path, "/v1/auth") {
 			next.ServeHTTP(w, r)
 			return
@@ -56,19 +53,13 @@ func JWTAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		userID, err := uuid.Parse(sub)
-		if err != nil {
-			http.Error(w, `{"error":"invalid user id in token"}`, http.StatusUnauthorized)
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), "user_id", userID)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		// Inject user_id ke request header supaya grpc-gateway forward ke gRPC metadata
+		r.Header.Set("x-user-id", sub)
+		next.ServeHTTP(w, r)
 	})
 }
 
 func RateLimit(next http.Handler) http.Handler {
-	// Simple pass-through untuk sekarang, bisa dikembangkan dengan golang.org/x/time/rate
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
 	})

@@ -50,7 +50,9 @@ services:
 
   # ── Services ───────────────────────────────────────────
   user-service:
-    build: ./user-service
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
     environment:
       DB_URL: postgres://postgres:postgres@user-db:5432/user_db?sslmode=disable
       GRPC_PORT: 50051
@@ -62,7 +64,9 @@ services:
         condition: service_healthy
 
   product-service:
-    build: ./product-service
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
     environment:
       DB_URL: postgres://postgres:postgres@product-db:5432/product_db?sslmode=disable
       GRPC_PORT: 50052
@@ -73,7 +77,9 @@ services:
         condition: service_healthy
 
   order-service:
-    build: ./order-service
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
     environment:
       DB_URL: postgres://postgres:postgres@order-db:5432/order_db?sslmode=disable
       GRPC_PORT: 50053
@@ -83,10 +89,14 @@ services:
     depends_on:
       order-db:
         condition: service_healthy
+      product-service:
+        condition: service_started
 
   # ── API Gateway ────────────────────────────────────────
   gateway:
-    build: ./gateway
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
     environment:
       HTTP_PORT: 8080
       USER_SERVICE_ADDR: user-service:50051

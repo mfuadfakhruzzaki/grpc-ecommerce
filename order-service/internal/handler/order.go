@@ -8,6 +8,7 @@ import (
 	pb "github.com/mfuadfakhruzzaki/grpc-ecommerce/proto/order/v1"
 	svc "github.com/mfuadfakhruzzaki/grpc-ecommerce/order-service/internal/service"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -20,10 +21,22 @@ func New(svc *svc.OrderService) *OrderHandler {
 	return &OrderHandler{svc: svc}
 }
 
-func (h *OrderHandler) CreateOrder(ctx context.Context, req *pb.CreateOrderReq) (*pb.CreateOrderRes, error) {
-	userID, ok := ctx.Value("user_id").(uuid.UUID)
+func userIDFromCtx(ctx context.Context) (uuid.UUID, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "missing user id")
+		return uuid.UUID{}, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+	vals := md.Get("x-user-id")
+	if len(vals) == 0 {
+		return uuid.UUID{}, status.Error(codes.Unauthenticated, "missing user id")
+	}
+	return uuid.Parse(vals[0])
+}
+
+func (h *OrderHandler) CreateOrder(ctx context.Context, req *pb.CreateOrderReq) (*pb.CreateOrderRes, error) {
+	userID, err := userIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	var items []svc.OrderItemInput
@@ -89,9 +102,9 @@ func (h *OrderHandler) GetOrder(ctx context.Context, req *pb.GetOrderReq) (*pb.G
 }
 
 func (h *OrderHandler) ListOrders(ctx context.Context, req *pb.ListOrdersReq) (*pb.ListOrdersRes, error) {
-	userID, ok := ctx.Value("user_id").(uuid.UUID)
-	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "missing user id")
+	userID, err := userIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	orders, total, err := h.svc.ListOrders(ctx, userID, req.Page, req.Limit)

@@ -13,6 +13,7 @@ import (
 	pbuser "github.com/mfuadfakhruzzaki/grpc-ecommerce/proto/user/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -35,25 +36,36 @@ func main() {
 	}
 
 	ctx := context.Background()
-	mux := runtime.NewServeMux()
+
+	// Forward header x-user-id ke gRPC metadata
+	mux := runtime.NewServeMux(
+		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
+			if key == "X-User-Id" {
+				return "x-user-id", true
+			}
+			return runtime.DefaultHeaderMatcher(key)
+		}),
+		runtime.WithMetadata(func(ctx context.Context, r *http.Request) metadata.MD {
+			md := metadata.MD{}
+			if userID := r.Header.Get("x-user-id"); userID != "" {
+				md["x-user-id"] = []string{userID}
+			}
+			return md
+		}),
+	)
+
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
-	// Register user service
 	if err := pbuser.RegisterUserServiceHandlerFromEndpoint(ctx, mux, userAddr, opts); err != nil {
 		log.Fatalf("failed to register user service: %v", err)
 	}
-
-	// Register product service
 	if err := pbproduct.RegisterProductServiceHandlerFromEndpoint(ctx, mux, productAddr, opts); err != nil {
 		log.Fatalf("failed to register product service: %v", err)
 	}
-
-	// Register order service
 	if err := pborder.RegisterOrderServiceHandlerFromEndpoint(ctx, mux, orderAddr, opts); err != nil {
 		log.Fatalf("failed to register order service: %v", err)
 	}
 
-	// Chain middleware
 	handler := middleware.RateLimit(middleware.JWTAuth(mux))
 
 	log.Printf("gateway listening on :%s", httpPort)
