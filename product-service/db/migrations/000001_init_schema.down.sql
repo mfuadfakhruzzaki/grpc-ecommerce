@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS stock_logs;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS categories;
