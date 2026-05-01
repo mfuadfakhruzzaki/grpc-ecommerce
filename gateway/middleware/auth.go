@@ -59,8 +59,17 @@ func JWTAuth(next http.Handler) http.Handler {
 	})
 }
 
+// RateLimit membatasi jumlah request concurrent menggunakan semaphore.
+// Request yang melebihi kapasitas akan diblokir hingga slot tersedia atau timeout.
 func RateLimit(next http.Handler) http.Handler {
+	sem := make(chan struct{}, 400)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+			next.ServeHTTP(w, r)
+		case <-r.Context().Done():
+			http.Error(w, `{"error":"request cancelled"}`, http.StatusServiceUnavailable)
+		}
 	})
 }

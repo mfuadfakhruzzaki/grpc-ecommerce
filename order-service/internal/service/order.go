@@ -51,22 +51,16 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID uuid.UUID, items 
 			return db.Order{}, nil, fmt.Errorf("invalid product id: %s", item.ProductID)
 		}
 
-		// Cek stok via inter-service gRPC call
-		checkRes, err := s.productConn.CheckStock(ctx, &pbproduct.CheckStockReq{
-			ProductId: item.ProductID,
-			Quantity:  item.Quantity,
-		})
-		if err != nil || !checkRes.Available {
-			return db.Order{}, nil, fmt.Errorf("insufficient stock for product %s", item.ProductID)
-		}
-
-		// Ambil harga produk
+		// Ambil harga + cek stok dalam satu call (eliminasi CheckStock terpisah)
 		productRes, err := s.productConn.GetProduct(ctx, &pbproduct.GetProductReq{Id: item.ProductID})
 		if err != nil {
 			return db.Order{}, nil, fmt.Errorf("product not found: %s", item.ProductID)
 		}
+		if productRes.Product.StockQty < item.Quantity {
+			return db.Order{}, nil, fmt.Errorf("insufficient stock for product %s", item.ProductID)
+		}
 
-		// Deduct stok
+		// Deduct stok (atomik di DB: WHERE stock_qty >= $2)
 		_, err = s.productConn.DeductStock(ctx, &pbproduct.DeductStockReq{
 			ProductId: item.ProductID,
 			Quantity:  item.Quantity,

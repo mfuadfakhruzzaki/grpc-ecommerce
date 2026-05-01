@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/mfuadfakhruzzaki/grpc-ecommerce/gateway/middleware"
@@ -13,6 +14,7 @@ import (
 	pbuser "github.com/mfuadfakhruzzaki/grpc-ecommerce/proto/user/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -54,7 +56,15 @@ func main() {
 		}),
 	)
 
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                10 * time.Second,
+			Timeout:             3 * time.Second,
+			PermitWithoutStream: true,
+		}),
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+	}
 
 	if err := pbuser.RegisterUserServiceHandlerFromEndpoint(ctx, mux, userAddr, opts); err != nil {
 		log.Fatalf("failed to register user service: %v", err)

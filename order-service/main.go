@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	pb "github.com/mfuadfakhruzzaki/grpc-ecommerce/proto/order/v1"
@@ -14,6 +15,7 @@ import (
 	"github.com/mfuadfakhruzzaki/grpc-ecommerce/order-service/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -30,7 +32,14 @@ func main() {
 	}
 
 	// Connect ke product-service
-	productConn, err := grpc.NewClient(productAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	productConn, err := grpc.NewClient(productAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                10 * time.Second,
+			Timeout:             3 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	)
 	if err != nil {
 		log.Fatalf("cannot connect to product-service: %v", err)
 	}
@@ -47,12 +56,28 @@ func main() {
 	if err := sqlDB.Ping(); err != nil {
 		log.Fatalf("cannot connect to db: %v", err)
 	}
+	sqlDB.SetMaxOpenConns(50)
+	sqlDB.SetMaxIdleConns(25)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
 	repo := repository.New(sqlDB)
 	svc := service.New(repo, productClient)
 	h := handler.New(svc)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.MaxConcurrentStreams(500),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle:     30 * time.Second,
+			MaxConnectionAge:      2 * time.Minute,
+			MaxConnectionAgeGrace: 5 * time.Second,
+			Time:                  10 * time.Second,
+			Timeout:               3 * time.Second,
+		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             5 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	)
 	pb.RegisterOrderServiceServer(grpcServer, h)
 	reflection.Register(grpcServer)
 
